@@ -5,6 +5,9 @@ import sys
 import json
 
 
+idx_X = 0
+idx_Y = 1
+
 def main(argv):
     parser = argparse.ArgumentParser(description="Given csv files describing functions,"
                                                  " calculate their integrals over given intervals")
@@ -39,22 +42,46 @@ def main(argv):
 
 def integral_from_file(file, start, end, separator, euro, nobase, debug):
     dp = DebugPrinter(debug)
-    idx_X = 0
-    idx_Y = 1
     with open(file) as f:
         reader = csv.reader(f, delimiter=separator)
         vals = [[get_float(x[idx_X], euro), get_float(x[idx_Y], euro)] for x in reader if end >= get_float(x[idx_X], euro) >= start]
         dp.p(vals)
+        dp.p(len(vals))
         if len(vals) == 0:
             return 0
         else:
-            s = sum([x[idx_Y] for x in vals])
-            base = baseline(vals[0][idx_Y], vals[-1][idx_Y], (vals[-1][idx_X] - vals[0][idx_X] + 1))
+            s = trapeze_integral(vals)
+            base_end_X = vals[-1][idx_X]
+            base_start_X = vals[0][idx_X]
+            base_end_Y = vals[-1][idx_Y]
+            base_start_Y = vals[0][idx_Y]
+            base = baseline(vals[0][idx_Y], vals[-1][idx_Y], (vals[-1][idx_X] - vals[0][idx_X]))
+            dp.p(base_start_X, "baseline start X")
+            dp.p(base_end_X, "baseline end X  ")
+            dp.p(base_start_Y, "baseline start Y")
+            dp.p(base_end_Y, "baseline end Y  ")
             if nobase:
                 return s
             else:
                 return s - base
 
+
+# just rectangles with X = 1 and Y = point's Y
+def rect_integral(vals):
+    sum([x[idx_Y] for x in vals])
+
+# makes no sense for single value
+def trapeze_integral(vals):
+    i = 1
+    totalsum = 0.0
+    while i < len(vals):
+        trap_a = vals[i][idx_Y]
+        trap_b = vals[i-1][idx_Y]
+        trap_h = abs(vals[i][idx_X] - vals[i-1][idx_X])
+        trap_s = (trap_a + trap_b) * trap_h / 2.0
+        totalsum += trap_s
+        i += 1
+    return totalsum
 
 def baseline(start_Y, end_Y, length_X):
     return (start_Y + end_Y) * length_X / 2.
@@ -69,9 +96,12 @@ class DebugPrinter:
     def __init__(self, debug):
         self.debug = debug
 
-    def p(self, v):
+    def p(self, v, desc=""):
         if self.debug:
-            print(v)
+            if len(desc) == 0:
+                print(v)
+            else:
+                print(desc + ": " + str(v))
 
 
 if __name__ == "__main__":

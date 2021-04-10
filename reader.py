@@ -8,6 +8,7 @@ import json
 idx_X = 0
 idx_Y = 1
 
+
 def main(argv):
     parser = argparse.ArgumentParser(description="Given csv files describing functions,"
                                                  " calculate their integrals over given intervals")
@@ -18,6 +19,7 @@ def main(argv):
     parser.add_argument("--european_number", "-e", "--euro", dest="euro", action="store_const", const=True, default=False)
     parser.add_argument("--zerobase", "-z", dest="nobase", action="store_const", const=True, default=False)
     parser.add_argument("--debug", "-d", dest="debug", action="store_const", const=True, default=False)
+    parser.add_argument("--print_csv", "-p", dest="print_csv", action="store_const", const=True, default=False)
     args = parser.parse_args()
 
     results = {}
@@ -27,6 +29,7 @@ def main(argv):
     euro = args.euro
     nobase = args.nobase
     debug = args.debug
+    print_csv = args.print_csv
     csv_separator = args.csv_separator[0]
 
     if os.path.isdir(path_name):
@@ -36,7 +39,11 @@ def main(argv):
     else:
         results[path_name] = integral_from_file(path_name, start, end, csv_separator, euro, nobase, debug)
 
-    print(json.dumps(results))
+    if print_csv:
+        for k in results:
+            print(f'{k},{results[k]}')
+    else:
+        print(json.dumps(results))
     return results
 
 
@@ -51,15 +58,7 @@ def integral_from_file(file, start, end, separator, euro, nobase, debug):
             return 0
         else:
             s = trapeze_integral(vals)
-            base_end_X = vals[-1][idx_X]
-            base_start_X = vals[0][idx_X]
-            base_end_Y = vals[-1][idx_Y]
-            base_start_Y = vals[0][idx_Y]
-            base = baseline(vals[0][idx_Y], vals[-1][idx_Y], (vals[-1][idx_X] - vals[0][idx_X]))
-            dp.p(base_start_X, "baseline start X")
-            dp.p(base_end_X, "baseline end X  ")
-            dp.p(base_start_Y, "baseline start Y")
-            dp.p(base_end_Y, "baseline end Y  ")
+            base = min_min_baseline(vals, debug)
             if nobase:
                 return s
             else:
@@ -69,6 +68,7 @@ def integral_from_file(file, start, end, separator, euro, nobase, debug):
 # just rectangles with X = 1 and Y = point's Y
 def rect_integral(vals):
     sum([x[idx_Y] for x in vals])
+
 
 # makes no sense for single value
 def trapeze_integral(vals):
@@ -83,8 +83,54 @@ def trapeze_integral(vals):
         i += 1
     return totalsum
 
-def baseline(start_Y, end_Y, length_X):
-    return (start_Y + end_Y) * length_X / 2.
+
+def start_end_baseline(vals, debug):
+    dp = DebugPrinter(debug)
+    base_end_X = vals[-1][idx_X]
+    base_start_X = vals[0][idx_X]
+    base_end_Y = vals[-1][idx_Y]
+    base_start_Y = vals[0][idx_Y]
+    dp.p(base_start_X, "baseline start X")
+    dp.p(base_end_X, "baseline end X  ")
+    dp.p(base_start_Y, "baseline start Y")
+    dp.p(base_end_Y, "baseline end Y  ")
+    return (base_start_Y + base_end_Y) * (base_end_X - base_start_X) / 2.
+
+
+def min_min_baseline(vals, debug):
+    dp = DebugPrinter(debug)
+    n = len(vals)
+    firstq_idx = int(n/4)
+    firstq = vals[:firstq_idx]
+    lastq_idx = int(3*n/4)
+    lastq = vals[lastq_idx:]
+    firstq_min_val = 1000000000.
+    lastq_min_val = 1000000000.
+    firstq_min_pos = 0.
+    lastq_min_pos = 0.
+    for kv in firstq:
+        if kv[idx_Y] < firstq_min_val:
+            firstq_min_val = kv[idx_Y]
+            firstq_min_pos = kv[idx_X]
+    for kv in lastq:
+        if kv[idx_Y] < lastq_min_val:
+            lastq_min_val = kv[idx_Y]
+            lastq_min_pos = kv[idx_X]
+
+    base_end_X = vals[-1][idx_X]
+    base_start_X = vals[0][idx_X]
+
+    baseline_a = (firstq_min_val - lastq_min_val)/(firstq_min_pos - lastq_min_pos)
+    baseline_b = firstq_min_val - baseline_a * firstq_min_pos
+    dp.p(baseline_a, "baseline incline")
+    dp.p(baseline_b, "baseline intercept")
+    base_end_Y = baseline_a * base_end_X + baseline_b
+    base_start_Y = baseline_a * base_start_X + baseline_b
+    dp.p(base_start_X, "baseline start X")
+    dp.p(base_end_X, "baseline end X  ")
+    dp.p(base_start_Y, "baseline start Y")
+    dp.p(base_end_Y, "baseline end Y  ")
+    return (base_start_Y + base_end_Y) * (base_end_X - base_start_X) / 2.
 
 
 def get_float(num_str, euro=False):

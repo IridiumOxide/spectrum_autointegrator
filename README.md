@@ -1,9 +1,11 @@
-Script to simplify comparing integrals of spectra stored in CSV files in a given directory.
+# IntSpect
+
+A tool to simplify comparing integrals of spectra stored in CSV files in a given directory.
 
 Usage:
 
 ```sh
-python reader.py PATH START END [--euro] [-c S] [--zerobase]
+python intspect-cli.py PATH START END [--euro] [-c S] [--zerobase]
 ```
 * PATH can point to a single file or a directory.
     * If it's a directory, all files inside will be processed as CSVs.
